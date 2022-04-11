@@ -1,47 +1,50 @@
-﻿#include <fstream>  // объект для потока ввода
-#include <iostream> // поток ввода/вывода
+﻿#include <iostream>
+#include <fstream>
 #include <vector>
 #include <stack>
 
 using namespace std;
 
-const string IN_PATH  = "in.txt",
-             OUT_PATH = "out.txt",
-             INF_PATH = "info.txt";
+const char *IN_PATH = "in.txt",
+          *OUT_PATH = "out.txt",
+          *INF_PATH = "info.txt";
 
-const char REL  = 1,  // REL (relation) - связь
-           CREL = 2;  // CREL (checked relation) - проверенная связь
-
+const char REL = 1, // relation - связь
+          CREL = 2; // checked relation - проверенная связь
 
 int main()
 {
-   int N, V; // N - кол-во ребер, V - кол-во вершин
+   setlocale(0, "");
+
+   // E - кол-во ребер, V - кол-во вершин, UE (unchecked edges) - кол-во вершин, которые алгоритм не перебрал
+   int E, V, UE;
    vector<vector<char>> graph;
 
-   ifstream stream(INF_PATH);
-
-   if (!stream.is_open()) // Проверка открытия файла
+   ifstream in(INF_PATH);
+   if (!in.is_open())
    {
       cerr << "Не удалось открыть файл " << INF_PATH;
       return -1;
    }
-   stream >> N >> V;
-   stream.close();
+   in >> E >> V;
 
-   stream = ifstream(IN_PATH);
-   if (!stream.is_open())
+   UE = E;
+
+   in = ifstream(IN_PATH);
+   if (!in.is_open())
    {
       cerr << "Не удалось открыть файл " << IN_PATH;
       return -1;
    }
 
+
    graph.resize(V);
    for (int i = 0; i < V; i++)
       graph[i].resize(V);
 
-   for (int r, c, i = 0; i < N; i++)
+   for (int r, c, i = 0; i < E; i++)
    {
-       stream >> r >> c;
+       in >> r >> c;
 
        graph[r][c] = REL;
        graph[c][r] = REL;
@@ -50,15 +53,6 @@ int main()
    // В этом стеке будем хранить номера строк матрицы графа [Номер строки также обозначает номер вершины графа, таким образом мы сохраняем номер строки в стеке до тех пор, пока не пройдем по всем ее поддеревьям]. Когда мы спускаемся, вершина добавляется в стек, когда поднимаемся - вершина удаляется из стека, потому что больше мы к ней не собираемся возвращаться.
    stack<int> stack;
    
-   /*
-   *
-   *
-      # ИДЕЯ! Есть ситуация, когда K первых вершин (0 до К) не используются. По алгоритму, они будут проверятся, хотя логично, раз в этих строках нет '1', значит и проверять их смысла не имеет. 
-      Как это решить: можно в цикле, в котором происходит считывание вершин из файла, запоминать самую минимальную (а то и просто вести список используемых вершин). ВРОДЕ КАК ЭТО СОКРАТИТ КОЛ-ВО НЕНУЖНЫХ ИТЕРАЦИЙ.
-   *
-   *
-   */
-
    // Добавляем первую строку в стек сразу, поскольку в непустом файле мы всегда начниаем с 0-ой строки (даже если у нас не будет задана вершина '0', мы не получим ошибку, потому что в конце концев перейдем к нужной строке).
    stack.push(0);
 
@@ -80,9 +74,11 @@ int main()
       // Смотрим, можно ли нырнуть глубже от текущей вершины.
       if (dive)
       {
-         // Если можно, то помечаем текущую вершину как "уже пройденную" в матрице, задав отношение и в строку и в столбец в виде '2'.
-         graph[r][c] = graph[c][r] = CREL;
-         //cout << r << " " << c << endl;
+         UE--;
+         // Помечаем текущую вершину как "уже пройденную" в матрице, задав отношение и в строку и в столбец в виде '2'.
+         graph[r][c] = CREL;
+         graph[c][r] = CREL;
+
          // Добавляем данную вершину в стек, чтобы когда, мы поднимались вверх, смогли проверить остальные поддеревья на этой строке (<FIND_SUBTREE>). Также помечаем [r = c], что теперь мы будем просматривать (<FIND_SUBTREE>) ту строку, для которой только что нашли отношение ('c' по сути является и номером строки, если транспонировать матрицу графа).
          stack.push(r = c);
       }
@@ -90,27 +86,21 @@ int main()
       else stack.pop();
    }
 
-   bool one_component = true;
-   for (int r = 0; r < graph.size(); r++)
+   ofstream out = ofstream(OUT_PATH);
+   if (!in.is_open())
    {
-      for (int c = 0; c < graph[r].size(); c++)
-         cout << (int)graph[r][c] << "  ";
-      cout << endl;
+      cerr << "Не удалось открыть файл " << OUT_PATH;
+      return -1;
    }
 
-   for (int r = 0; r < graph.size() && one_component; r++)
+   if (UE == 0)
    {
-      for (int c = 0; c < graph[r].size() && one_component; c++)
-         one_component = graph[r][c] != 1;
+      if (E == V - 1)
+         out << "Дерево." << endl;
+      else out << "Не дерево: есть цикл." << endl;
    }
+   else out << "Не дерево: компонент связности больше 1." << endl;
 
-   if (one_component)
-   {
-      if (N == V - 1)
-         cout << "Vse ZBS" << endl;
-      else cout << "Have loop" << endl;
-   }
-   else cout << "Greater than 1 relation component" << endl;
-
+   cout << "Ок!";
    return 0;
 }
