@@ -5,95 +5,50 @@
 
 using namespace std;
 
-const char *IN_PATH = "in.txt",
-          *OUT_PATH = "out.txt",
-          *INF_PATH = "info.txt";
+int DFS(vector<vector<char>> &graph);
+void generate_graph(int v_count);
 
-const char REL = 1, // relation - связь
-          CREL = 2; // checked relation - проверенная связь
 
 int main()
 {
-   setlocale(0, "");
+   generate_graph(10000);
 
-   // E - кол-во ребер, V - кол-во вершин, UE (unchecked edges) - кол-во вершин, которые алгоритм не перебрал
-   int E, V, UE;
-   vector<vector<char>> graph;
+   int V, E;
 
-   ifstream in(INF_PATH);
+   ifstream in("info.txt");
    if (!in.is_open())
    {
-      cerr << "Не удалось открыть файл " << INF_PATH;
+      cerr << "Не удалось открыть файл info";
       return -1;
    }
-   in >> E >> V;
+   in >> V >> E;
 
-   UE = E;
 
-   in = ifstream(IN_PATH);
+   in = ifstream("in.txt");
    if (!in.is_open())
    {
-      cerr << "Не удалось открыть файл " << IN_PATH;
+      cerr << "Не удалось открыть файл in";
       return -1;
    }
 
 
-   graph.resize(V);
+   vector<vector<char>> graph(V);
    for (int i = 0; i < V; i++)
       graph[i].resize(V);
 
-   for (int r, c, i = 0; i < E; i++)
+   for (int i = 0; i < E; i++)
    {
-       in >> r >> c;
+      int r, c;
+      in >> r >> c;
 
-       graph[r][c] = REL;
-       graph[c][r] = REL;
+      graph[r][c] = 1;
+      graph[c][r] = 1;
    }
 
-   // В этом стеке будем хранить номера строк матрицы графа [Номер строки также обозначает номер вершины графа, таким образом мы сохраняем номер строки в стеке до тех пор, пока не пройдем по всем ее поддеревьям]. Когда мы спускаемся, вершина добавляется в стек, когда поднимаемся - вершина удаляется из стека, потому что больше мы к ней не собираемся возвращаться.
-   stack<int> stack;
-   
-   // Добавляем первую строку в стек сразу, поскольку в непустом файле мы всегда начниаем с 0-ой строки (даже если у нас не будет задана вершина '0', мы не получим ошибку, потому что в конце концев перейдем к нужной строке).
-   stack.push(0);
 
-   // Проход будет идти, пока стек не станет пуст (это будет означать, что мы перебрали все строки матрицы, а значит и вершины).
-   // TODO проверить, верно ли все работает с графом, у которого нет допустим 0, 1 вершины, то есть некоторые первые строки матрицы не будут использоваться.
-   while (!stack.empty())
-   {
-      // c (column) - номер столбца (тоже самое, что и вершина), у которого есть связь с r, при этом по вычисленному c мы еще не спускались;
-      // r (row) - номер строки, у которой мы ищем не пройденные ранее вершины (c).
-      int c = 0, r = stack.top();
-      // Погружаемся ли дальше в глубину, то есть спускаемся ли по поддереву вниз.
-      bool dive = false;
+   ofstream out = ofstream("out.txt");
 
-      // <FIND_SUBTREE> Ищем есть ли на текущей (r) строке связь с какой-нибудь вершиной (c), которую мы еще не проверили.
-      while (c < V && !dive)
-         dive = graph[r][c++] == REL;
-      c--; // TODO ПОПЫТАТЬСЯ УЛУЧШИТЬ ЗАПИСЬ: после отработки цикла 'c' лишний раз увеличивается из-за 'c++', потому его нужно уменьшить.
-
-      // Смотрим, можно ли нырнуть глубже от текущей вершины.
-      if (dive)
-      {
-         UE--;
-         // Помечаем текущую вершину как "уже пройденную" в матрице, задав отношение и в строку и в столбец в виде '2'.
-         graph[r][c] = CREL;
-         graph[c][r] = CREL;
-
-         // Добавляем данную вершину в стек, чтобы когда, мы поднимались вверх, смогли проверить остальные поддеревья на этой строке (<FIND_SUBTREE>). Также помечаем [r = c], что теперь мы будем просматривать (<FIND_SUBTREE>) ту строку, для которой только что нашли отношение ('c' по сути является и номером строки, если транспонировать матрицу графа).
-         stack.push(r = c);
-      }
-      // Иначе, получается, что спускаться от данной вершины больше некуда. Остается только возвращаться наверх, чтобы обработать остальные узлы.
-      else stack.pop();
-   }
-
-   ofstream out = ofstream(OUT_PATH);
-   if (!in.is_open())
-   {
-      cerr << "Не удалось открыть файл " << OUT_PATH;
-      return -1;
-   }
-
-   if (UE == 0)
+   if (E - DFS(graph) == 0)
    {
       if (E == V - 1)
          out << "Дерево." << endl;
@@ -101,6 +56,55 @@ int main()
    }
    else out << "Не дерево: компонент связности больше 1." << endl;
 
-   cout << "Ок!";
    return 0;
+}
+
+
+int DFS(vector<vector<char>> &graph)
+{
+   int checked_edges = 0;
+
+   stack<int> stack;
+   stack.push(0);
+
+   while (!stack.empty())
+   {
+      bool down = false;
+      int r = stack.top();
+
+      for (int c = 0; c < graph.size() && !down; c++)
+      {
+         if (down = graph[r][c] == 1)
+         {
+            checked_edges++;
+
+            graph[r][c] = 2;
+            graph[c][r] = 2;
+
+            stack.push(c);
+         }
+      }
+
+      if (!down) stack.pop();
+   }
+
+   return checked_edges;
+}
+
+void generate_graph(int v_count)
+{
+   ofstream out("info.txt");
+   out << v_count + 1 << ' ' << v_count << endl;
+
+
+   out = ofstream("in.txt");
+
+   int v_num = 0, dif = 1;
+   for (int i = 0; i < v_count; i += 2)
+   {
+      out << v_num << ' ' << dif++ << endl;
+      out << v_num << ' ' << dif++ << endl;
+
+      v_num++;
+   }
 }
